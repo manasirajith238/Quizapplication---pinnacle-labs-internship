@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Log in · Quiz Challenge</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="shell">
+  <div class="brand">
+    <div class="brand-mark">Q</div>
+    <div class="brand-name">Quiz Challenge</div>
+  </div>
+  <div class="page-header">
+    <h1 id="page-title">Log in</h1>
+    <p id="page-sub">Sign in to play the quiz and see the leaderboard.</p>
+  </div>
+
+  <div class="status-row">
+    <div class="server-status">
+      <span class="dot" id="status-dot"></span>
+      
+    </div>
+  </div>
+
+  <div class="card auth-card">
+    <div id="alert-area"></div>
+
+    <div class="field">
+      <label for="auth-username">Username</label>
+      <input id="auth-username" type="text" autocomplete="username" placeholder="e.g. jane_doe">
+    </div>
+    <div class="field">
+      <label for="auth-password">Password</label>
+      <input id="auth-password" type="password" autocomplete="current-password" placeholder="••••••••">
+    </div>
+
+    <button class="btn-primary" id="auth-submit" onclick="doLogin()">Log in</button>
+
+    <div class="auth-switch">
+      Don't have an account? <a onclick="showRegister()">Sign up</a>
+    </div>
+
+    <div class="seed-note" id="seed-note">
+      
+    </div>
+  </div>
+</div>
+
+<script src="js/app.js"></script>
+<script>
+let mode = 'login'; // 'login' | 'register'
+
+function showAlert(type, text) {
+  document.getElementById('alert-area').innerHTML =
+    `<div class="alert alert-${type}">${escapeHtml(text)}</div>`;
+}
+function clearAlert() {
+  document.getElementById('alert-area').innerHTML = '';
+}
+
+function showLogin() {
+  mode = 'login';
+  document.getElementById('page-title').textContent = 'Log in';
+  document.getElementById('page-sub').textContent = 'Sign in to play the quiz and see the leaderboard.';
+  document.getElementById('auth-submit').textContent = 'Log in';
+  document.getElementById('auth-submit').onclick = doLogin;
+  document.getElementById('auth-password').autocomplete = 'current-password';
+  document.querySelector('.auth-switch').innerHTML =
+    `Don't have an account? <a onclick="showRegister()">Sign up</a>`;
+  document.getElementById('seed-note').style.display = '';
+  clearAlert();
+}
+
+function showRegister() {
+  mode = 'register';
+  document.getElementById('page-title').textContent = 'Create an account';
+  document.getElementById('page-sub').textContent = 'Sign up to start playing.';
+  document.getElementById('auth-submit').textContent = 'Sign up';
+  document.getElementById('auth-submit').onclick = doRegister;
+  document.getElementById('auth-password').autocomplete = 'new-password';
+  document.querySelector('.auth-switch').innerHTML =
+    `Already have an account? <a onclick="showLogin()">Log in</a>`;
+  document.getElementById('seed-note').style.display = 'none';
+  clearAlert();
+}
+
+async function doLogin() {
+  const username = document.getElementById('auth-username').value.trim();
+  const password = document.getElementById('auth-password').value;
+  if (!username || !password) {
+    showAlert('error', 'Please enter both username and password.');
+    return;
+  }
+  const btn = document.getElementById('auth-submit');
+  btn.disabled = true; btn.textContent = 'Logging in…';
+  try {
+    const res = await fetch(API + '/api/login', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ username, password })
+    });
+    const data = await res.json();
+    if (!res.ok || data.error) {
+      showAlert('error', data.error || 'Login failed.');
+      btn.disabled = false; btn.textContent = 'Log in';
+      return;
+    }
+    Session.set({ username: data.username, password, role: data.role });
+    window.location.href = 'home.html';
+  } catch (e) {
+    showAlert('error', 'Could not reach the server. Is it running?');
+    btn.disabled = false; btn.textContent = 'Log in';
+  }
+}
+
+async function doRegister() {
+  const username = document.getElementById('auth-username').value.trim();
+  const password = document.getElementById('auth-password').value;
+  if (!username || !password) {
+    showAlert('error', 'Please enter both username and password.');
+    return;
+  }
+  const btn = document.getElementById('auth-submit');
+  btn.disabled = true; btn.textContent = 'Creating account…';
+  try {
+    const res = await fetch(API + '/api/register', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ username, password })
+    });
+    const data = await res.json();
+    if (!res.ok || data.error) {
+      showAlert('error', data.error || 'Registration failed.');
+      btn.disabled = false; btn.textContent = 'Sign up';
+      return;
+    }
+    showLogin();
+    showAlert('success', 'Account created. You can log in now.');
+  } catch (e) {
+    showAlert('error', 'Could not reach the server. Is it running?');
+    btn.disabled = false; btn.textContent = 'Sign up';
+  }
+}
+
+// If already logged in, skip straight to the quiz.
+if (Session.get()) {
+  window.location.href = 'home.html';
+}
+
+// Allow Enter key to submit.
+document.getElementById('auth-password').addEventListener('keydown', e => {
+  if (e.key === 'Enter') (mode === 'login' ? doLogin() : doRegister());
+});
+
+checkServerStatus();
+</script>
+</body>
+</html>

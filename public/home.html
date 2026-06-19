@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Home · Quiz Challenge</title>
+<link rel="stylesheet" href="css/style.css">
+<style>
+  .home-shell {
+    width: 100%; max-width: 440px;
+  }
+  .welcome {
+    text-align: center;
+    margin-bottom: 2rem;
+  }
+  .welcome h1 {
+    font-family: var(--font-display);
+    font-size: 28px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    color: var(--ink);
+    margin-bottom: 6px;
+  }
+  .welcome p {
+    font-size: 14px;
+    color: var(--ink-soft);
+  }
+  .welcome .username {
+    color: var(--accent);
+    font-weight: 600;
+  }
+
+  .menu-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    overflow: hidden;
+    margin-bottom: 1rem;
+  }
+  .menu-item {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    width: 100%;
+    padding: 18px 20px;
+    background: transparent;
+    border: none;
+    border-bottom: 1px solid var(--border);
+    cursor: pointer;
+    font-family: var(--font-body);
+    text-align: left;
+    text-decoration: none;
+    color: var(--ink);
+    transition: background 0.15s;
+  }
+  .menu-item:last-child { border-bottom: none; }
+  .menu-item:hover { background: var(--surface-2); }
+  .menu-item:hover .menu-arrow { color: var(--accent); transform: translateX(3px); }
+
+  .menu-icon {
+    width: 42px; height: 42px;
+    border-radius: var(--radius-sm);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 20px;
+    flex-shrink: 0;
+  }
+  .menu-icon.purple { background: var(--accent-soft); }
+  .menu-icon.green  { background: var(--green-soft); }
+  .menu-icon.red    { background: var(--red-soft); }
+
+  .menu-text { flex: 1; }
+  .menu-title {
+    font-size: 15px; font-weight: 600;
+    color: var(--ink); display: block;
+  }
+  .menu-sub {
+    font-size: 12px; color: var(--ink-soft);
+    margin-top: 2px; display: block;
+  }
+  .menu-arrow {
+    font-size: 18px; color: var(--ink-faint);
+    transition: color 0.15s, transform 0.15s;
+  }
+
+  .logout-item .menu-title { color: var(--red); }
+  .logout-item .menu-arrow { color: var(--red-soft); }
+  .logout-item:hover { background: var(--red-soft); }
+  .logout-item:hover .menu-arrow { color: var(--red); transform: translateX(0); }
+
+  .admin-badge-row {
+    text-align: center;
+    margin-bottom: 1.25rem;
+  }
+
+  .footer-note {
+    text-align: center;
+    font-size: 12px;
+    color: var(--ink-faint);
+    margin-top: 1rem;
+    font-family: var(--font-mono);
+  }
+</style>
+</head>
+<body>
+<div class="home-shell">
+  <div class="brand" style="margin-bottom: 1.5rem;">
+    <div class="brand-mark">Q</div>
+    <div class="brand-name">Quiz Challenge</div>
+  </div>
+
+  <div class="status-row" style="margin-bottom: 1.25rem;">
+    <div class="server-status">
+      <span class="dot" id="status-dot"></span>
+      <span id="status-text">Connecting…</span>
+    </div>
+  </div>
+
+  <div class="welcome">
+    <h1>Welcome back, <span class="username" id="display-name"></span>!</h1>
+    <p>What would you like to do today?</p>
+  </div>
+
+  <div class="admin-badge-row" id="admin-badge-row" style="display:none">
+    <span class="role-badge">admin</span>
+  </div>
+
+  <div class="menu-card" id="menu-card"></div>
+
+  <div class="footer-note"></div>
+</div>
+
+<script src="js/app.js"></script>
+<script>
+  const session = Session.requireLogin();
+  if (session) {
+    document.getElementById('display-name').textContent = session.username;
+
+    const isAdmin = session.role === 'admin';
+    if (isAdmin) {
+      document.getElementById('admin-badge-row').style.display = '';
+    }
+
+    function menuItem(href, icon, iconClass, title, sub, extraClass) {
+      return `<a class="menu-item ${extraClass||''}" href="${href}">
+        <div class="menu-icon ${iconClass}">${icon}</div>
+        <div class="menu-text">
+          <span class="menu-title">${title}</span>
+          <span class="menu-sub">${sub}</span>
+        </div>
+        <span class="menu-arrow">›</span>
+      </a>`;
+    }
+
+    const userMenu = `
+      ${menuItem('index.html',     '🎯', 'purple', 'Start Quiz',   '8 questions · 20 seconds each')}
+      ${menuItem('dashboard.html', '🏆', 'green',  'Leaderboard',  'See the top scores')}
+    `;
+
+    const adminMenu = `
+      ${menuItem('dashboard.html', '📊', 'purple', 'Admin Dashboard', 'Users, stats, recent results')}
+      ${menuItem('dashboard.html', '🏆', 'green',  'Leaderboard',     'See the top scores')}
+    `;
+
+    document.getElementById('menu-card').innerHTML = `
+      ${isAdmin ? adminMenu : userMenu}
+      <button class="menu-item logout-item" onclick="logout()">
+        <div class="menu-icon red">🚪</div>
+        <div class="menu-text">
+          <span class="menu-title">Log out</span>
+          <span class="menu-sub">Sign out of your account</span>
+        </div>
+        <span class="menu-arrow">›</span>
+      </button>
+    `;
+  }
+  checkServerStatus();
+</script>
+</body>
+</html>

@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Quiz · Quiz Challenge</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="shell">
+  <div class="brand">
+    <div class="brand-mark">Q</div>
+    <div class="brand-name">Quiz Challenge</div>
+  </div>
+
+  <div class="status-row">
+    <div class="server-status">
+      <span class="dot" id="status-dot"></span>
+      <span id="status-text">Connecting to server…</span>
+    </div>
+  </div>
+
+  <div class="topbar" id="topbar"></div>
+
+  <div id="quiz-panel"></div>
+</div>
+
+<script src="js/app.js"></script>
+<script>
+const TIME_PER_Q = 20; // seconds per question
+
+let session = Session.requireLogin();
+let questions = [], current = 0, score = 0;
+let selected = null, result = null;
+let timerInterval = null, timeLeft = TIME_PER_Q;
+let totalElapsedMs = 0;
+let lastScore = null, lastTimeMs = null, lastTotal = null;
+let scoreSaved = false;
+
+async function init() {
+  if (!session) return; // already redirected to login
+  renderTopbar('quiz');
+  const online = await checkServerStatus();
+  if (!online) {
+    document.getElementById('quiz-panel').innerHTML =
+      `<div class="error-box"><b>Cannot connect to the C++ backend.</b><br>
+       Start it with: <code>./quiz_server</code></div>`;
+    return;
+  }
+  await startQuiz();
+}
+
+async function startQuiz() {
+  try {
+    const data = await fetch(API + '/api/questions').then(r => r.json());
+    questions = data.sort(() => Math.random() - 0.5).slice(0, 8);
+    current = 0; score = 0; selected = null; result = null;
+    totalElapsedMs = 0; scoreSaved = false;
+    renderQuiz();
+  } catch (e) {
+    document.getElementById('quiz-panel').innerHTML =
+      `<div class="error-box"><b>Cannot load questions.</b><br>
+       Start the server with: <code>./quiz_server</code></div>`;
+  }
+}
+
+// ── Timer ──────────────────────────────────────────────────
+function startTimer() {
+  clearInterval(timerInterval);
+  timeLeft = TIME_PER_Q;
+  updateTimerUI();
+  timerInterval = setInterval(() => {
+    timeLeft -= 0.1;
+    if (timeLeft <= 0) {
+      timeLeft = 0;
+      clearInterval(timerInterval);
+      handleTimeout();
+    }
+    updateTimerUI();
+  }, 100);
+}
+function stopTimer() { clearInterval(timerInterval); }
+
+function updateTimerUI() {
+  const bar = document.getElementById('timer-bar');
+  const digit = document.getElementById('timer-digit');
+  if (!bar || !digit) return;
+  const pct = (timeLeft / TIME_PER_Q) * 100;
+  bar.style.width = pct + '%';
+  digit.textContent = Math.ceil(timeLeft) + 's';
+  bar.className = 'timer-bar' + (pct <= 25 ? ' danger' : pct <= 50 ? ' warn' : '');
+  digit.className = 'timer-digit' + (pct <= 25 ? ' danger' : '');
+}
+
+async function handleTimeout() {
+  if (selected) return;
+  selected = '__timeout__';
+  const q = questions[current];
+  totalElapsedMs += TIME_PER_Q * 1000;
+  const correctInfo = await fetch(API+'/api/answer',{method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({questionId:q.id,answer:q.correctAnswer})}).then(r=>r.json());
+  result = { correct: false, correctAnswer: q.correctAnswer,
+    explanation: "Time's up! " + correctInfo.explanation };
+  renderQuiz();
+}
+
+async function pick(id) {
+  if (selected) return;
+  const elapsed = (TIME_PER_Q - timeLeft) * 1000;
+  totalElapsedMs += elapsed;
+  stopTimer();
+  selected = id;
+  const q = questions[current];
+  result = await fetch(API+'/api/answer',{method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({questionId:q.id,answer:id})}).then(r=>r.json());
+  if (result.correct) score++;
+  renderQuiz();
+}
+
+// ── Render ────────────────────────────────────────────────
+function renderQuiz() {
+  const q = questions[current];
+  const pct = ((current + (selected ? 1 : 0)) / questions.length * 100).toFixed(0);
+  const timedOut = selected === '__timeout__';
+
+  document.getElementById('quiz-panel').innerHTML = `
+    <div class="progress-label">
+      <span>Question ${current+1} of ${questions.length}</span>
+      <span>Score <span class="score-value">${score}</span></span>
+    </div>
+    <div class="progress-wrap">
+      <div class="progress-fill" style="width:${pct}%"></div>
+    </div>
+    <div class="timer-card">
+      <div class="timer-bar-wrap">
+        <div class="timer-bar" id="timer-bar" style="width:100%"></div>
+      </div>
+      <div class="timer-digit" id="timer-digit">${TIME_PER_Q}s</div>
+    </div>
+    <div class="card">
+      <span class="badge">${q.category}</span>
+      <p class="q-text">${q.text}</p>
+    </div>
+    <div class="options">
+      ${q.options.map(o => {
+        let cls = '';
+        if (selected) {
+          if (o.id === result?.correctAnswer) cls = 'correct';
+          else if (o.id === selected && !result?.correct) cls = timedOut ? 'timeout' : 'wrong';
+        }
+        return `<button class="opt ${cls}" onclick="pick('${o.id}')" ${selected?'disabled':''}>
+          <span class="opt-id">${o.id}</span><span>${o.text}</span>
+        </button>`;
+      }).join('')}
+    </div>
+    ${result ? `<div class="explanation">
+      <b>${timedOut ? "⏱ Time's up!" : result.correct ? '✓ Correct!' : '✗ Incorrect.'}</b>
+      ${result.explanation}
+    </div>` : ''}
+    ${selected ? `<button class="btn-primary" onclick="next()">
+      ${current+1>=questions.length ? 'See results' : 'Next question →'}
+    </button>` : ''}
+  `;
+
+  if (!selected) startTimer();
+  else updateTimerUI();
+}
+
+function next() {
+  if (current + 1 >= questions.length) {
+    lastScore = score;
+    lastTotal = questions.length;
+    lastTimeMs = Math.round(totalElapsedMs);
+    renderResult();
+    return;
+  }
+  current++; selected = null; result = null;
+  renderQuiz();
+}
+
+function renderResult() {
+  stopTimer();
+  const pct = Math.round(score / questions.length * 100);
+  const grade = pct>=90?'Excellent! 🏆':pct>=70?'Well done! 🎯':pct>=50?'Good try! 👍':'Keep practicing! 📚';
+  const totalSec = (lastTimeMs / 1000).toFixed(1);
+
+  document.getElementById('quiz-panel').innerHTML = `
+    <div class="card result">
+      <div class="score-ring">
+        <div class="score-num">${score}</div>
+        <div class="score-lbl">/ ${questions.length}</div>
+      </div>
+      <h2>${grade}</h2>
+      <p class="lead">You answered ${score} of ${questions.length} correctly.</p>
+      <div class="stats">
+        <div class="stat">
+          <div class="stat-v" style="color:var(--green)">${score}</div>
+          <div class="stat-n">Correct</div>
+        </div>
+        <div class="stat">
+          <div class="stat-v" style="color:var(--red)">${questions.length-score}</div>
+          <div class="stat-n">Wrong</div>
+        </div>
+        <div class="stat">
+          <div class="stat-v">${pct}%</div>
+          <div class="stat-n">Score</div>
+        </div>
+        <div class="stat">
+          <div class="stat-v">${totalSec}s</div>
+          <div class="stat-n">Time</div>
+        </div>
+      </div>
+
+      ${!scoreSaved
+        ? `<button class="btn-primary" id="save-btn" onclick="saveScore()">Save to leaderboard</button>`
+        : `<div class="saved-badge">✓ Score saved to leaderboard</div>`}
+
+      <button class="btn-secondary" onclick="restart()">Play again</button>
+    </div>`;
+}
+
+async function saveScore() {
+  const saveBtn = document.getElementById('save-btn');
+  if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = 'Saving…'; }
+  try {
+    await fetch(API + '/api/leaderboard', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        username: session.username, password: session.password,
+        score: lastScore, total: lastTotal, timeMs: lastTimeMs
+      })
+    });
+    scoreSaved = true;
+    renderResult();
+  } catch (e) {
+    if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = 'Save to leaderboard'; }
+  }
+}
+
+function restart() {
+  scoreSaved = false;
+  startQuiz();
+}
+
+init();
+</script>
+</body>
+</html>

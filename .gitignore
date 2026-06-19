@@ -1,0 +1,16 @@
+# Build artifacts
+quiz_server
+quiz_server.exe
+*.o
+*.obj
+*.exe
+
+# Database (created at runtime)
+quiz.db
+
+# Editor / OS junk
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
