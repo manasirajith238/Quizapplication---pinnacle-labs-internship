@@ -8,6 +8,7 @@
 #include <thread>
 #include <mutex>
 #include <sqlite3.h>
+#include <cstdlib>
 
 #ifdef _WIN32
   #include <winsock2.h>
@@ -518,7 +519,8 @@ int main() {
 
     initDB();
 
-    int port = 8765;
+    const char* port_env = std::getenv("PORT");
+    int port = port_env ? std::stoi(port_env) : 8765;
     SOCKET serverSock = socket(AF_INET, SOCK_STREAM, 0);
     if (serverSock == INVALID_SOCKET) { std::cerr << "Socket error\n"; return 1; }
 
