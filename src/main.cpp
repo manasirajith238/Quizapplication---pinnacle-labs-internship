@@ -9,6 +9,7 @@
 #include <mutex>
 #include <sqlite3.h>
 #include <cstdlib>
+#include <fstream>
 
 #ifdef _WIN32
   #include <winsock2.h>
@@ -129,11 +130,11 @@ void initDB() {
 
     if (adminCount == 0) {
         sqlite3_prepare_v2(db,
-            "INSERT OR IGNORE INTO users (username, password, role) VALUES ('admin', 'admin123', 'admin');",
+            "INSERT OR IGNORE INTO users (username, password, role) VALUES ('admin', 'Quiz@Pinnacle2026', 'admin');",
             -1, &stmt, nullptr);
         sqlite3_step(stmt);
         sqlite3_finalize(stmt);
-        std::cout << "Seeded default admin account -> username: admin / password: admin123\n";
+        std::cout << "Seeded default admin account -> username: admin\n";
         std::cout << "Change this password in production!\n";
     }
 }
@@ -501,7 +502,26 @@ void handleClient(SOCKET clientSock) {
     } else if (method == "GET" && path == "/api/health") {
         response = buildResponse(200, "application/json", "{\"status\":\"ok\",\"questions\":" + std::to_string(questions.size()) + "}");
     } else {
-        response = buildResponse(404, "application/json", "{\"error\":\"Not found\"}");
+        // Serve static files from ./public/
+        std::string filePath = path;
+        if (filePath == "/" || filePath.empty()) filePath = "/login.html";
+        std::string fullPath = "./public" + filePath;
+
+        std::ifstream file(fullPath, std::ios::binary);
+        if (file) {
+            std::ostringstream ss;
+            ss << file.rdbuf();
+            std::string fileBody = ss.str();
+
+            std::string ct = "text/plain";
+            if (fullPath.ends_with(".html")) ct = "text/html";
+            else if (fullPath.ends_with(".css"))  ct = "text/css";
+            else if (fullPath.ends_with(".js"))   ct = "application/javascript";
+
+            response = buildResponse(200, ct, fileBody);
+        } else {
+            response = buildResponse(404, "application/json", "{\"error\":\"Not found\"}");
+        }
     }
 
     send(clientSock, response.c_str(), (int)response.size(), 0);
