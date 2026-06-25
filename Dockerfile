@@ -1,37 +1,38 @@
-# ── Stage 1: Build ──────────────────────────────────────────────────────────
+# ── Stage 1: Build the C++ server ────────────────────────────────────────────
 FROM debian:bookworm-slim AS builder
 
 RUN apt-get update && apt-get install -y \
-    g++ \
-    make \
-    libsqlite3-dev \
+    g++ make libsqlite3-dev \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 COPY src/ ./src/
 COPY Makefile ./
-
 RUN make
 
-# ── Stage 2: Runtime ─────────────────────────────────────────────────────────
+# ── Stage 2: Runtime (nginx + C++ server) ────────────────────────────────────
 FROM debian:bookworm-slim
 
 RUN apt-get update && apt-get install -y \
-    libsqlite3-0 \
+    nginx libsqlite3-0 \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
-# Copy the compiled binary
+# C++ binary
 COPY --from=builder /app/quiz_server ./quiz_server
 
-# Copy the frontend static files
-COPY public/ ./public/
+# Frontend static files → nginx web root
+COPY public/ /usr/share/nginx/html/
 
-# Railway injects PORT env var; our server must listen on it
-# The app currently hardcodes 8765 — we handle that via an env var below
-ENV PORT=8765
+# Nginx config
+COPY nginx.conf /etc/nginx/conf.d/default.conf
+RUN rm -f /etc/nginx/sites-enabled/default
 
-EXPOSE 8765
+# Start script: launch C++ server in background, then nginx in foreground
+RUN echo '#!/bin/sh\n/app/quiz_server &\nnginx -g "daemon off;"' > /start.sh \
+    && chmod +x /start.sh
 
-CMD ["./quiz_server"]
+EXPOSE 80
+
+CMD ["/start.sh"]
