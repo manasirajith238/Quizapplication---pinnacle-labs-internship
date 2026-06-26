@@ -121,7 +121,6 @@ void initDB() {
         ");"
     );
 
-    // Seed a default admin account if no admin exists yet.
     sqlite3_stmt* stmt;
     sqlite3_prepare_v2(db, "SELECT COUNT(*) FROM users WHERE role='admin';", -1, &stmt, nullptr);
     int adminCount = 0;
@@ -135,7 +134,7 @@ void initDB() {
         sqlite3_step(stmt);
         sqlite3_finalize(stmt);
         std::cout << "Seeded default admin account -> username: admin\n";
-        std::cout << "Change this password in production!\n";
+        std::cout << "Change this password before going to production!\n";
     }
 }
 
@@ -171,7 +170,6 @@ std::string getParam(const std::string& body, const std::string& key) {
     } else {
         std::string val;
         while (pos < body.size() && body[pos] != ',' && body[pos] != '}') val += body[pos++];
-        // trim whitespace
         while (!val.empty() && (val.back() == ' ' || val.back() == '\t' || val.back() == '\r')) val.pop_back();
         return val;
     }
@@ -221,8 +219,6 @@ std::string buildAnswerJson(int qid, const std::string& chosen) {
 // ────────────────────────────────────────────────────────────────
 // Auth helpers
 // ────────────────────────────────────────────────────────────────
-// Returns: 0 = not found / wrong password, otherwise user id.
-// Also fills outRole with 'user' or 'admin'.
 int verifyUser(const std::string& username, const std::string& password, std::string& outRole) {
     std::lock_guard<std::mutex> lock(dbMutex);
     sqlite3_stmt* stmt;
@@ -367,7 +363,6 @@ std::string buildLeaderboardJson() {
     return ss.str();
 }
 
-// Admin stats: total users, total quizzes taken, average score, top 5 results
 std::string buildAdminStatsJson(const std::string& username, const std::string& password) {
     if (!isAdmin(username, password)) {
         return "{\"error\":\"Admin access required\"}";
@@ -393,7 +388,6 @@ std::string buildAdminStatsJson(const std::string& username, const std::string& 
     }
     sqlite3_finalize(stmt);
 
-    // Recent results (last 10)
     std::ostringstream recent;
     recent << "[";
     sqlite3_prepare_v2(db,
@@ -427,6 +421,18 @@ std::string buildAdminStatsJson(const std::string& username, const std::string& 
     ss << "\"recentResults\":" << recent.str();
     ss << "}";
     return ss.str();
+}
+
+// ────────────────────────────────────────────────────────────────
+// Static file serving helper
+// ────────────────────────────────────────────────────────────────
+std::string getContentType(const std::string& path) {
+    if (path.size() >= 5 && path.substr(path.size() - 5) == ".html") return "text/html";
+    if (path.size() >= 4 && path.substr(path.size() - 4) == ".css")  return "text/css";
+    if (path.size() >= 3 && path.substr(path.size() - 3) == ".js")   return "application/javascript";
+    if (path.size() >= 4 && path.substr(path.size() - 4) == ".png")  return "image/png";
+    if (path.size() >= 4 && path.substr(path.size() - 4) == ".ico")  return "image/x-icon";
+    return "text/plain";
 }
 
 // ────────────────────────────────────────────────────────────────
@@ -500,7 +506,8 @@ void handleClient(SOCKET clientSock) {
         bool ok = result.find("\"error\"") == std::string::npos;
         response = buildResponse(ok ? 200 : 401, "application/json", result);
     } else if (method == "GET" && path == "/api/health") {
-        response = buildResponse(200, "application/json", "{\"status\":\"ok\",\"questions\":" + std::to_string(questions.size()) + "}");
+        response = buildResponse(200, "application/json",
+            "{\"status\":\"ok\",\"questions\":" + std::to_string(questions.size()) + "}");
     } else {
         // Serve static files from ./public/
         std::string filePath = path;
@@ -512,13 +519,7 @@ void handleClient(SOCKET clientSock) {
             std::ostringstream ss;
             ss << file.rdbuf();
             std::string fileBody = ss.str();
-
-            std::string ct = "text/plain";
-            if (fullPath.ends_with(".html")) ct = "text/html";
-            else if (fullPath.ends_with(".css"))  ct = "text/css";
-            else if (fullPath.ends_with(".js"))   ct = "application/javascript";
-
-            response = buildResponse(200, ct, fileBody);
+            response = buildResponse(200, getContentType(fullPath), fileBody);
         } else {
             response = buildResponse(404, "application/json", "{\"error\":\"Not found\"}");
         }
