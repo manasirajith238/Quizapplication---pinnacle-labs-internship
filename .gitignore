@@ -1,4 +1,7 @@
 # Build artifacts
+src/sqlite3.o
+src/sqlite3.c
+src/sqlite3.h
 quiz_server
 quiz_server.exe
 *.o
