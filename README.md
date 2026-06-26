@@ -5,7 +5,7 @@
 > multi-page HTML/CSS/JS frontend featuring user accounts, a per-question
 > countdown timer, a persistent leaderboard, and an admin dashboard.
 
-🚀 **Live demo:** [https://your-app.up.railway.app](https://your-app.up.railway.app) <!-- Replace with your Railway URL -->
+🚀 **Live demo:** [https://quizapplication--production.up.railway.app](https://quizapplication--production.up.railway.app)
 
 ---
 
@@ -13,10 +13,21 @@
 
 - **Login / Register** — username + password, stored in SQLite
 - **Role-based accounts** — `user` and `admin`
-- **Quiz** — 8 randomised questions, 20-second timer per question
+- **Quiz** — 10 randomised questions, 20-second timer per question
 - **Leaderboard** — top 10 scores, sorted by score then fastest time; persisted to SQLite
 - **Admin dashboard** — total users, quizzes taken, average score, recent results (admin only)
 - **Professional UI** — Space Grotesk + Inter + JetBrains Mono type system, dark mode, responsive
+
+---
+
+## Tech stack
+
+| Layer     | Technology                                      |
+|-----------|-------------------------------------------------|
+| Backend   | C++17 — raw TCP sockets, hand-rolled HTTP server |
+| Database  | SQLite3 (embedded, zero config)                 |
+| Frontend  | Vanilla HTML / CSS / JavaScript (no frameworks) |
+| Hosting   | Railway (Docker-based deployment)               |
 
 ---
 
@@ -54,7 +65,7 @@ This app is deployed on [Railway](https://railway.app) using Docker.
 2. Go to [railway.app](https://railway.app) → **New Project → Deploy from GitHub repo**.
 3. Select this repository. Railway auto-detects the `Dockerfile` and starts building.
 4. Once deployed, go to **Settings → Networking → Generate Domain** to get your public URL.
-5. Update the API base URL in `public/js/app.js` to match your Railway domain, then push again.
+5. Update `API_BASE` in `public/js/app.js` to match your Railway domain, then push again.
 
 ### Environment variables
 
@@ -101,25 +112,14 @@ g++ -std=c++17 -O2 -o quiz_server src/main.cpp -lpthread -lsqlite3
 g++ -std=c++17 -O2 -o quiz_server.exe src/main.cpp -lws2_32 -lsqlite3
 ```
 
-The server listens on **http://localhost:8765** by default and creates `quiz.db` on first run.
-Open `public/login.html` in your browser to use the app.
+Open `http://localhost:8765` in your browser after starting the server.
 
 ### Running with Docker locally
 
 ```bash
 docker build -t quiz-app .
-docker run -p 8765:8765 quiz-app
+docker run -p 8080:8080 quiz-app
 ```
-
----
-
-## Admin account
-
-On first run the server seeds one admin account. **Change the password in `src/main.cpp` before deploying** — look for the seed SQL and replace the default value.
-
-| Username | Password        |
-|----------|-----------------|
-| `admin`  | *(set by you)*  |
 
 ---
 
@@ -143,8 +143,17 @@ On first run the server seeds one admin account. **Change the password in `src/m
 This project is built for learning and demo purposes:
 
 - Passwords are stored in plain text — a production version would use bcrypt or argon2.
-- No session tokens — credentials are re-sent on each protected request; the Railway deployment runs over HTTPS which mitigates exposure in transit.
+- No session tokens — credentials are re-sent on each protected request; Railway provides HTTPS which mitigates exposure in transit.
 - No rate limiting on login/register endpoints.
+
+---
+
+## Internship
+
+Built during my internship at **Pinnacle Labs** as a full-stack project demonstrating:
+- Systems programming in C++ (networking, threading, database integration)
+- Frontend development without frameworks
+- Containerised deployment with Docker and Railway
 
 ---
 
