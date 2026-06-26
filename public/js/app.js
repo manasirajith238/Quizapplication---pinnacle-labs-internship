@@ -1,7 +1,7 @@
 /* ============================================================
    Quiz Challenge — shared helpers
    ============================================================ */
-const API = 'http://localhost:8765';
+const API_BASE = 'https://quizapplication-pinnacle-labs-internship-production.up.railway.app';
 
 const Session = {
   get() {
